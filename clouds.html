@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<!-- saved from url=(0047)https://mrdoob.com/lab/javascript/webgl/clouds/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<title>Clouds</title>
+		
+		<style type="text/css">
+
+			body {
+				background-color: #326696;
+				margin: 0px;
+				overflow: hidden;
+				font-family:Monospace;
+				font-size:13px;
+				text-align:center;
+				font-weight: bold;
+				text-align:center;
+			}
+
+			a {
+				color:#0078ff;
+			}
+
+		</style>
+	<script type="text/javascript" async="" src="./Clouds_files/ga.js.download"></script></head>
+	<body>
+
+		<script src="./Clouds_files/ga.js(1).download"></script>
+
+		<script type="text/javascript" src="./Clouds_files/three.min.js.download"></script>
+		<script type="text/javascript" src="./Clouds_files/Detector.js.download"></script>
+
+		<script id="vs" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+
+			void main() {
+
+				vUv = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+
+		<script id="fs" type="x-shader/x-fragment">
+
+			uniform sampler2D map;
+
+			uniform vec3 fogColor;
+			uniform float fogNear;
+			uniform float fogFar;
+
+			varying vec2 vUv;
+
+			void main() {
+
+				float depth = gl_FragCoord.z / gl_FragCoord.w;
+				float fogFactor = smoothstep( fogNear, fogFar, depth );
+
+				gl_FragColor = texture2D( map, vUv );
+				gl_FragColor.w *= pow( gl_FragCoord.z, 20.0 );
+				gl_FragColor = mix( gl_FragColor, vec4( fogColor, gl_FragColor.w ), fogFactor );
+
+			}
+
+		</script>
+
+		<script type="text/javascript">
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container;
+			var camera, scene, renderer;
+			var mesh, geometry, material;
+
+			var mouseX = 0, mouseY = 0;
+			var start_time = Date.now();
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			init();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// Bg gradient
+
+				var canvas = document.createElement( 'canvas' );
+				canvas.width = 32;
+				canvas.height = window.innerHeight;
+
+				var context = canvas.getContext( '2d' );
+
+				var gradient = context.createLinearGradient( 0, 0, 0, canvas.height );
+				gradient.addColorStop(0, "#1e4877");
+				gradient.addColorStop(0.5, "#4584b4");
+
+				context.fillStyle = gradient;
+				context.fillRect(0, 0, canvas.width, canvas.height);
+
+				container.style.background = 'url(' + canvas.toDataURL('image/png') + ')';
+				container.style.backgroundSize = '32px 100%';
+
+				//
+
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 3000 );
+				camera.position.z = 6000;
+
+				scene = new THREE.Scene();
+
+				geometry = new THREE.Geometry();
+
+				var texture = THREE.ImageUtils.loadTexture( 'cloud10.png', null, animate );
+				texture.magFilter = THREE.LinearMipMapLinearFilter;
+				texture.minFilter = THREE.LinearMipMapLinearFilter;
+
+				var fog = new THREE.Fog( 0x4584b4, - 100, 3000 );
+
+				material = new THREE.ShaderMaterial( {
+
+					uniforms: {
+
+						"map": { type: "t", value: texture },
+						"fogColor" : { type: "c", value: fog.color },
+						"fogNear" : { type: "f", value: fog.near },
+						"fogFar" : { type: "f", value: fog.far },
+
+					},
+					vertexShader: document.getElementById( 'vs' ).textContent,
+					fragmentShader: document.getElementById( 'fs' ).textContent,
+					depthWrite: false,
+					depthTest: false,
+					transparent: true
+
+				} );
+
+				var plane = new THREE.Mesh( new THREE.PlaneGeometry( 64, 64 ) );
+
+				for ( var i = 0; i < 8000; i++ ) {
+
+					plane.position.x = Math.random() * 1000 - 500;
+					plane.position.y = - Math.random() * Math.random() * 200 - 15;
+					plane.position.z = i;
+					plane.rotation.z = Math.random() * Math.PI;
+					plane.scale.x = plane.scale.y = Math.random() * Math.random() * 1.5 + 0.5;
+
+					THREE.GeometryUtils.merge( geometry, plane );
+
+				}
+
+				mesh = new THREE.Mesh( geometry, material );
+				scene.add( mesh );
+
+				mesh = new THREE.Mesh( geometry, material );
+				mesh.position.z = - 8000;
+				scene.add( mesh );
+
+				renderer = new THREE.WebGLRenderer( { antialias: false } );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function onDocumentMouseMove( event ) {
+
+				mouseX = ( event.clientX - windowHalfX ) * 0.25;
+				mouseY = ( event.clientY - windowHalfY ) * 0.15;
+
+			}
+
+			function onWindowResize( event ) {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				position = ( ( Date.now() - start_time ) * 0.03 ) % 8000;
+
+				camera.position.x += ( mouseX - camera.position.x ) * 0.01;
+				camera.position.y += ( - mouseY - camera.position.y ) * 0.01;
+				camera.position.z = - position + 8000;
+
+				renderer.render( scene, camera );
+
+			}
+
+		</script><div style="background: url(&quot;data:image/png;base64,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&quot;) 0% 0% / 32px 100%;"><canvas width="1920" height="1045" style="width: 1280px; height: 697px;"></canvas></div>
+	
+
+</body></html>
